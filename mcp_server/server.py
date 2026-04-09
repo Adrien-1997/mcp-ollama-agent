@@ -144,6 +144,13 @@ def create_app() -> FastAPI:
     async def health():
         return {"status": "ok", "tools": [t.name for t in await list_tools()]}
 
+    @app.get("/tools")
+    async def tools_schema():
+        return [
+            {"name": t.name, "description": t.description, "inputSchema": t.inputSchema}
+            for t in await list_tools()
+        ]
+
     class CallRequest(BaseModel):
         tool: str
         arguments: dict = {}

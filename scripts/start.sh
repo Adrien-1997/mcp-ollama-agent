@@ -41,7 +41,7 @@ else
   sleep 3
 fi
 
-for model in llama3.2 nomic-embed-text; do
+for model in qwen2.5:1.5b nomic-embed-text; do
   if ollama list 2>/dev/null | grep -q "$model"; then
     echo "[ok] $model already pulled"
   else
@@ -51,20 +51,7 @@ for model in llama3.2 nomic-embed-text; do
 done
 
 # ---------------------------------------------------------------------------
-# 3. Docker check
-# ---------------------------------------------------------------------------
-
-SKIP_DOCKER=false
-if ! command -v docker &>/dev/null; then
-  echo "[WARN] Docker not found -- Open WebUI will be skipped."
-  SKIP_DOCKER=true
-elif ! docker info &>/dev/null 2>&1; then
-  echo "[WARN] Docker daemon not running -- Open WebUI will be skipped."
-  SKIP_DOCKER=true
-fi
-
-# ---------------------------------------------------------------------------
-# 4. Start services
+# 3. Start services
 # ---------------------------------------------------------------------------
 
 echo ""
@@ -80,21 +67,9 @@ AGENT_PID=$!
 
 sleep 2
 
-if [ "$SKIP_DOCKER" = false ]; then
-  echo "[..] Starting Open WebUI on :3000"
-  docker run -d --rm \
-    --name open-webui \
-    -p 3000:8080 \
-    --add-host=host.docker.internal:host-gateway \
-    -v open-webui:/app/backend/data \
-    -e OPENAI_API_BASE_URL=http://host.docker.internal:8000/v1 \
-    -e OPENAI_API_KEY=local \
-    ghcr.io/open-webui/open-webui:main
-fi
-
 echo ""
 echo "All services running"
-[ "$SKIP_DOCKER" = false ] && echo "  Open WebUI  -> http://localhost:3000"
+echo "  Chat UI     -> http://localhost:8000"
 echo "  Agent API   -> http://localhost:8000/docs"
 echo "  MCP server  -> http://localhost:8001/health"
 echo ""
@@ -104,7 +79,6 @@ cleanup() {
   echo ""
   echo "Stopping..."
   kill "$MCP_PID" "$AGENT_PID" 2>/dev/null
-  [ "$SKIP_DOCKER" = false ] && docker stop open-webui 2>/dev/null
   exit 0
 }
 

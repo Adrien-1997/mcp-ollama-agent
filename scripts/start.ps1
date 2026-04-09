@@ -63,7 +63,7 @@ try {
 # Pull models if not already present
 $pulledModels = (ollama list 2>$null) -join " "
 
-foreach ($model in @("llama3.2", "nomic-embed-text")) {
+foreach ($model in @("qwen2.5:1.5b", "nomic-embed-text")) {
     if ($pulledModels -notmatch $model) {
         Write-Host "[..] Pulling $model (first run, this may take a while)..." -ForegroundColor Yellow
         ollama pull $model

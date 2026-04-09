@@ -13,13 +13,14 @@ from agent.rag import similarity_search
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a helpful local AI assistant with access to tools.
+SYSTEM_PROMPT = """You are a helpful local AI assistant. You are the model {ollama_model}, running locally via Ollama.
+If anyone asks which model you are, what model is in use, or anything about your own identity, answer directly: you are {ollama_model}.
 
 Available tools (use ONLY when the question genuinely requires them):
 {tools}
 
 Rules:
-- For greetings, conversational messages, or questions you can answer from general knowledge, go DIRECTLY to Final Answer. Do NOT use any tool.
+- For greetings, conversational messages, or questions you can answer from general knowledge or your own identity, go DIRECTLY to Final Answer. Do NOT use any tool.
 - Only use a tool when you need live information (web search), file access, or code execution.
 - Only pass arguments that the tool explicitly accepts. Do not invent extra fields.
 
@@ -76,6 +77,7 @@ async def run_agent(query: str, agent_executor: AgentExecutor) -> dict:
     result = await agent_executor.ainvoke({
         "input": query,
         "context": context,
+        "ollama_model": settings.ollama_model,
     })
 
     return {

@@ -3,13 +3,15 @@
 Local AI agent with a custom MCP server, LangChain ReAct loop, and built-in chat UI.
 
 ```
-User (built-in chat UI · :8000)
+User (browser · :8000)
       │
       ▼
-OpenAI-compatible API  (FastAPI · :8000)
+FastAPI  ── chat UI        (GET  /)
+         ── OpenAI-compatible API (POST /v1/chat/completions)
+         ── Swagger docs   (GET  /docs)
       │
       ▼
-LangChain ReAct Agent  ──► Ollama (llama3.2 · :11434)
+LangChain ReAct Agent  ──► Ollama (qwen2.5:1.5b · :11434)
       │
       ▼
 MCP Client
@@ -24,11 +26,15 @@ MCP Server (:8001)
 ChromaDB  (local vector store · RAG)
 ```
 
+## How it works
+
+A user message hits the FastAPI gateway, which passes it to a LangChain ReAct agent running against a local Ollama model. The agent decides — step by step — whether to answer directly or call a tool. Tool calls go through an MCP client that speaks SSE to the MCP server; the server executes the tool (web search, file I/O, or sandboxed Python) and returns structured results. When relevant, past interactions are retrieved from ChromaDB via RAG and injected into the prompt as context. The final answer is streamed back to the chat UI or returned as an OpenAI-compatible JSON response.
+
 ## Stack
 
 | Layer | Tech |
 |---|---|
-| LLM | Ollama · llama3.2 or mistral:7b |
+| LLM | Ollama · qwen2.5:1.5b (default) · gemma3:4b (if 6+ GB free RAM) |
 | Orchestration | LangChain · ReAct agent |
 | Tool protocol | MCP (model-context-protocol) |
 | Vector store | ChromaDB + nomic-embed-text |
@@ -48,14 +54,14 @@ ChromaDB  (local vector store · RAG)
 
 **Windows (PowerShell)**
 ```powershell
-git clone https://github.com/your-username/mcp-ollama-agent
+git clone https://github.com/Adrien-1997/mcp-ollama-agent
 cd mcp-ollama-agent
 .\scripts\start.ps1
 ```
 
 **Linux / macOS**
 ```bash
-git clone https://github.com/your-username/mcp-ollama-agent
+git clone https://github.com/Adrien-1997/mcp-ollama-agent
 cd mcp-ollama-agent
 ./scripts/start.sh
 ```
@@ -98,10 +104,10 @@ mcp-ollama-agent/
 
 | Model | Avg latency (tool call) | RAM |
 |---|---|---|
-| llama3.2:3b | ~1.2s | 4 GB |
-| mistral:7b | ~2.8s | 6 GB |
+| qwen2.5:1.5b | ~2–4s | ~1 GB |
+| gemma3:4b | ~4–6s | ~3.6 GB |
 
-*Tested on M2 MacBook Pro, measured over 50 tool-call turns.*
+*Measured on i7-8565U · 16 GB RAM · CPU-only inference. `gemma3:2b` is the default — reliable ReAct format, fits with normal system load. `gemma3:4b` gives better reasoning but requires ~6 GB free RAM.*
 
 ## Trade-offs
 
