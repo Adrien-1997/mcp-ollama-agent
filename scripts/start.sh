@@ -67,9 +67,12 @@ AGENT_PID=$!
 
 sleep 2
 
+echo "[..] Starting Open WebUI on :3000"
+docker compose up -d
+
 echo ""
 echo "All services running"
-echo "  Chat UI     -> http://localhost:8000"
+echo "  Open WebUI  -> http://localhost:3000"
 echo "  Agent API   -> http://localhost:8000/docs"
 echo "  MCP server  -> http://localhost:8001/health"
 echo ""
@@ -79,6 +82,7 @@ cleanup() {
   echo ""
   echo "Stopping..."
   kill "$MCP_PID" "$AGENT_PID" 2>/dev/null
+  docker compose down
   exit 0
 }
 

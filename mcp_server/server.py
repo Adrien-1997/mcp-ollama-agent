@@ -140,6 +140,11 @@ def create_app() -> FastAPI:
     app.router.routes.append(Route("/sse", endpoint=handle_sse))
     app.router.routes.append(Mount("/messages", app=sse_transport.handle_post_message))
 
+    @app.get("/")
+    async def root():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/docs")
+
     @app.get("/health")
     async def health():
         return {"status": "ok", "tools": [t.name for t in await list_tools()]}
