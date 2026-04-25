@@ -13,6 +13,7 @@ from starlette.routing import Route, Mount
 from mcp_server.tools.web_search import web_search
 from mcp_server.tools.file_ops import file_read, file_write, file_list
 from mcp_server.tools.code_exec import code_exec
+from mcp_server.tools.kb_search import query_knowledge_base
 
 import inspect
 import json
@@ -87,6 +88,23 @@ async def list_tools() -> list[Tool]:
                 "required": ["code"],
             },
         ),
+        Tool(
+            name="query_knowledge_base",
+            description=(
+                "Search the local AI ecosystem knowledge base. "
+                "Contains documentation for Ollama, llama.cpp, LocalAI, Open WebUI, Jan, "
+                "text-generation-webui, AnythingLLM, PrivateGPT, LiteLLM, GPT4All, Continue, and Tabby. "
+                "Use this for questions about how to install, configure, or use any of these tools."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Natural-language search query (use this field)"},
+                    "k": {"type": "integer", "default": 4, "description": "Number of results to return (1-10)"},
+                },
+                "required": ["query"],
+            },
+        ),
     ]
 
 
@@ -109,6 +127,8 @@ async def _dispatch(name: str, arguments: dict) -> list[TextContent]:
             result = await file_list(**_filter_args(file_list, arguments))
         elif name == "code_exec":
             result = await code_exec(**_filter_args(code_exec, arguments))
+        elif name == "query_knowledge_base":
+            result = await query_knowledge_base(**_filter_args(query_knowledge_base, arguments))
         else:
             result = {"error": f"Unknown tool: {name}"}
         return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False))]

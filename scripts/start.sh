@@ -41,7 +41,7 @@ else
   sleep 3
 fi
 
-for model in qwen2.5:1.5b nomic-embed-text; do
+for model in qwen2.5:3b nomic-embed-text; do
   if ollama list 2>/dev/null | grep -q "$model"; then
     echo "[ok] $model already pulled"
   else

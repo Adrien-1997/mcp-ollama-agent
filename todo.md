@@ -3,9 +3,10 @@
 ## High priority
 
 - [x] **Windows start script** — `scripts/start.ps1` added.
-- [ ] **MCP tool descriptions** — `load_mcp_tools()` sets `description="MCP tool: {name}"`. Fetch real descriptions + input schemas from the `/health` endpoint so the LLM knows exactly which arguments each tool accepts (reduces hallucinated args).
+- [x] **MCP tool descriptions** — adapter fetches real descriptions + typed Pydantic schemas from `/tools`. Fallback `"MCP tool: {name}"` only fires if server omits description.
 - [ ] **RAG not tested** — `agent/rag.py` has no test coverage. Add unit tests (mock ChromaDB + embeddings).
-- [ ] **mcp_adapter not tested** — `agent/mcp_adapter.py` has no tests. Add tests for `MCPTool._arun` and `load_mcp_tools`.
+- [x] **`query_knowledge_base` MCP tool** — `mcp_server/tools/kb_search.py` added; registered in server; silent RAG injection removed from agent; prompt updated to guide explicit KB use.
+- [x] **mcp_adapter not tested** — `tests/test_mcp_adapter.py` added: schema building, `load_mcp_tools`, tool dispatch (9 tests).
 
 ## Medium priority
 
@@ -16,7 +17,8 @@
 
 ## Low priority / nice to have
 
-- [ ] **Docker Compose** — optional alternative to the start scripts: single `docker-compose.yml` with Ollama sidecar + MCP server + agent API.
+- [x] **Docker Compose** — `docker-compose.yml` added; runs Open WebUI (proxied to agent API) via `docker compose up -d` in `start.sh`.
 - [ ] **Structured logging** — switch from `logging.basicConfig` to JSON-structured logs for easier parsing.
+- [x] **Model upgrade** — default model changed from `qwen2.5:1.5b` to `qwen2.5:3b` in `agent/config.py` and `scripts/start.sh`.
 - [ ] **Streaming from the LLM** — current streaming is simulated (word-by-word split). Wire real token streaming from `ChatOllama`.
 - [ ] **Model hot-swap** — allow changing `OLLAMA_MODEL` without restarting the agent (reload on `/v1/models` selection).

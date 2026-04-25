@@ -1,63 +1,63 @@
-# MCP · Ollama · LangChain Agent
+# mcp-ollama-agent
 
-Local AI agent with a custom MCP server, LangChain ReAct loop, and built-in chat UI.
+**A fully local AI agent — private, offline, and production-grade.**
+
+Combines Ollama, LangChain, MCP (Model Context Protocol), ChromaDB RAG, and Open WebUI into a single deployable stack. The agent reasons step by step, calls tools when needed, and searches a knowledge base built from 12 real open-source AI project repositories — no cloud, no API keys, no data leaving your machine.
 
 ```
-User (browser · :8000)
-      │
-      ▼
-FastAPI  ── chat UI        (GET  /)
-         ── OpenAI-compatible API (POST /v1/chat/completions)
-         ── Swagger docs   (GET  /docs)
-      │
-      ▼
-LangChain ReAct Agent  ──► Ollama (qwen2.5:1.5b · :11434)
-      │
-      ▼
-MCP Client
-      │
-      ▼
-MCP Server (:8001)
-  ├── web_search  (DuckDuckGo)
-  ├── file_ops    (read / write local files)
-  └── code_exec   (sandboxed Python exec)
-      │
-      ▼
-ChromaDB  (local vector store · RAG)
+User (Open WebUI · :3000)
+        │
+        ▼
+  FastAPI  ──  OpenAI-compatible  POST /v1/chat/completions
+               Swagger UI         GET  /docs
+        │
+        ▼
+  LangChain ReAct Agent ──► Ollama (qwen2.5:3b · :11434)
+        │
+        ▼
+  MCP Client  ──►  MCP Server (:8001)
+                     ├── web_search            DuckDuckGo, live results
+                     ├── file_read/write/list  sandboxed workspace
+                     ├── code_exec             Python subprocess
+                     └── query_knowledge_base  ChromaDB · 3,700+ chunks
+                                │
+                                ▼
+                          ChromaDB + nomic-embed-text
+                          (Ollama, llama.cpp, LocalAI,
+                           Open WebUI, LiteLLM, Tabby …)
 ```
 
-## How it works
+## Why this project
 
-A user message hits the FastAPI gateway, which passes it to a LangChain ReAct agent running against a local Ollama model. The agent decides — step by step — whether to answer directly or call a tool. Tool calls go through an MCP client that speaks SSE to the MCP server; the server executes the tool (web search, file I/O, or sandboxed Python) and returns structured results. When relevant, past interactions are retrieved from ChromaDB via RAG and injected into the prompt as context. The final answer is streamed back to the chat UI or returned as an OpenAI-compatible JSON response.
+Most "local AI" demos connect a chat UI to a model and stop there. This project goes further:
+
+- **Explicit tool use via MCP** — tools are registered with typed JSON schemas; the agent decides when to call them.
+- **RAG over real documentation** — not toy data. 3,726 chunks ingested from 12 production GitHub repos covering the local AI ecosystem.
+- **OpenAI-compatible API** — swap Open WebUI for any client that speaks `/v1/chat/completions`.
+- **Fully reproducible** — one script starts every service. No manual setup.
 
 ## Stack
 
-| Layer | Tech |
+| Layer | Technology |
 |---|---|
-| LLM | Ollama · qwen2.5:1.5b (default) · gemma3:4b (if 6+ GB free RAM) |
-| Orchestration | LangChain · ReAct agent |
-| Tool protocol | MCP (model-context-protocol) |
-| Vector store | ChromaDB + nomic-embed-text |
-| API gateway | FastAPI (OpenAI-compatible) |
-| UI | Built-in chat UI (served by FastAPI at :8000) |
+| LLM runtime | [Ollama](https://ollama.com) · qwen2.5:3b (default) · qwen2.5:7b (high quality) |
+| Agent orchestration | [LangChain](https://python.langchain.com) · ReAct loop |
+| Tool protocol | [MCP](https://modelcontextprotocol.io) (SSE transport) |
+| Vector store | [ChromaDB](https://www.trychroma.com) + nomic-embed-text embeddings |
+| API gateway | [FastAPI](https://fastapi.tiangolo.com) (OpenAI-compatible) |
+| Chat UI | [Open WebUI](https://openwebui.com) (Docker · proxied to agent) |
 
 ## Quick start
 
-### 1. Install prerequisites
+### Prerequisites
 
-| Prerequisite | Required | Notes |
-|---|---|---|
-| [Ollama](https://ollama.com/download) | Yes | Models are pulled automatically on first run |
-| [Python 3.11+](https://python.org) | Yes | venv and deps are set up automatically by the start script |
+| Tool | Notes |
+|---|---|
+| [Ollama](https://ollama.com/download) | Models pulled automatically on first run |
+| Python 3.11+ | venv and deps created automatically |
+| [Docker](https://docs.docker.com/get-docker/) | Required for Open WebUI |
 
-### 2. Clone and run
-
-**Windows (PowerShell)**
-```powershell
-git clone https://github.com/Adrien-1997/mcp-ollama-agent
-cd mcp-ollama-agent
-.\scripts\start.ps1
-```
+### Run
 
 **Linux / macOS**
 ```bash
@@ -66,53 +66,223 @@ cd mcp-ollama-agent
 ./scripts/start.sh
 ```
 
-The script handles everything: starts Ollama, pulls models on first run, creates the venv, installs deps, and launches all services.
+**Windows (PowerShell)**
+```powershell
+git clone https://github.com/Adrien-1997/mcp-ollama-agent
+cd mcp-ollama-agent
+.\scripts\start.ps1
+```
 
-Open **http://localhost:8000** for the chat UI, or **http://localhost:8000/docs** for the raw API.
+The start script handles everything: creates the venv, installs deps, starts Ollama, pulls models on first run, launches the MCP server, agent API, and Open WebUI.
+
+| Service | URL |
+|---|---|
+| Chat UI (Open WebUI) | http://localhost:3000 |
+| Agent API (Swagger) | http://localhost:8000/docs |
+| MCP Server | http://localhost:8001/health |
+
+### Build the knowledge base (first time)
+
+```bash
+source .venv/bin/activate
+python scripts/ingest.py --reset
+```
+
+This fetches documentation from 12 GitHub repos, embeds ~3,700 chunks into ChromaDB using `nomic-embed-text`, and persists them to `.chroma/`. Takes ~20–30 min on CPU.
+
+```
+=== Done: 3726 chunks from 164 files across 13 repos ===
+```
+
+## Usage
+
+### Chat (Open WebUI)
+
+Open **http://localhost:3000**, select the `local-agent` model, and start chatting. The agent automatically routes knowledge base questions, web searches, and code execution through the right tools.
+
+**Example — knowledge base query:**
+
+> **User:** What quantization formats does llama.cpp support, and what's the difference between Q4_K_M and Q8_0?
+>
+> **Agent:** LLaMA supports several quantization formats, including Q4_K_M and Q8_0.
+>
+> - **Q4_K_M** — 4-bit integer quantization with mixed precision on attention/feed-forward layers. Low memory usage, small accuracy loss.
+> - **Q8_0** — 8-bit floating-point quantization. Higher precision than Q4_K_M but roughly twice the memory footprint.
+>
+> Q4_K_M is the recommended default for most machines. Use Q8_0 when accuracy matters more than RAM budget.
+
+The agent retrieved this answer from the ingested llama.cpp and LocalAI documentation via `query_knowledge_base`.
+
+### Agent API
+
+The agent exposes an OpenAI-compatible endpoint:
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "local-agent",
+    "messages": [{"role": "user", "content": "What quantization formats does llama.cpp support?"}],
+    "stream": false
+  }'
+```
+
+### Query the knowledge base directly
+
+The knowledge base is also accessible as a standalone REST tool — useful for testing retrieval or building your own clients:
+
+```bash
+curl http://localhost:8001/call \
+  -X POST -H "Content-Type: application/json" \
+  -d '{
+    "tool": "query_knowledge_base",
+    "arguments": {
+      "query": "llama.cpp GGUF quantization formats Q4 Q8",
+      "k": 3
+    }
+  }'
+```
+
+```json
+{
+  "query": "llama.cpp GGUF quantization formats Q4 Q8",
+  "results": [
+    {
+      "content": "| Backend | Quantization Types |\n|---------|-------------------|\n| llama-cpp-quantization | q2_k, q3_k_s, q3_k_m, q4_0, q4_k_s, q4_k_m, q5_0, q5_k_s, q5_k_m, q6_k, q8_0 |",
+      "source": "github/mudler/LocalAI/docs/content/features/quantization.md",
+      "url": "https://github.com/mudler/LocalAI/blob/master/docs/content/features/quantization.md"
+    },
+    {
+      "content": "ik_llama.cpp ships additional quantization types (IQK quants), custom quantization mixes, Multi-head Latent Attention (MLA) for superior CPU and hybrid GPU/CPU performance.",
+      "source": "github/mudler/LocalAI/docs/content/features/text-generation.md",
+      "url": "https://github.com/mudler/LocalAI/blob/master/docs/content/features/text-generation.md"
+    },
+    {
+      "content": "LLGuidance is a library for constrained decoding for Large Language Models — structured outputs and constrained sampling.",
+      "source": "github/ggerganov/llama.cpp/docs/llguidance.md",
+      "url": "https://github.com/ggerganov/llama.cpp/blob/master/docs/llguidance.md"
+    }
+  ]
+}
+```
+
+### Inspect available tools
+
+```bash
+curl http://localhost:8001/tools | python3 -m json.tool
+```
+
+Returns the full JSON Schema for each tool — the same payload the agent reads to build its typed tool registry.
+
+## Knowledge base
+
+### Covered projects
+
+| Project | What's indexed |
+|---|---|
+| [Ollama](https://github.com/ollama/ollama) | API reference, development guide, model examples |
+| [llama.cpp](https://github.com/ggerganov/llama.cpp) | Build docs, backends (CUDA, SYCL, Vulkan), quantization, multimodal |
+| [LocalAI](https://github.com/mudler/LocalAI) | Full feature docs: embeddings, image gen, audio, MCP, distributed inference |
+| [Open WebUI](https://github.com/open-webui/open-webui) | README, security |
+| [Jan](https://github.com/janhq/jan) | README, docs |
+| [text-generation-webui](https://github.com/oobabooga/text-generation-webui) | All 18 doc pages: parameters, training, OpenAI API, extensions |
+| [AnythingLLM](https://github.com/Mintplex-Labs/anything-llm) | README, bare metal setup |
+| [PrivateGPT](https://github.com/zylon-ai/private-gpt) | README |
+| [LiteLLM](https://github.com/BerriAI/litellm) | Architecture, proxy setup |
+| [GPT4All](https://github.com/nomic-ai/gpt4all) | README |
+| [Continue](https://github.com/continuedev/continue) | README, docs |
+| [Tabby](https://github.com/TabbyML/tabby) | Model spec, README |
+
+### Re-ingesting
+
+```bash
+# Wipe and re-ingest everything
+python scripts/ingest.py --reset
+
+# Preview what would be ingested (no DB writes)
+python scripts/ingest.py --dry-run
+```
 
 ## Project structure
 
 ```
 mcp-ollama-agent/
+├── agent/
+│   ├── main.py          # FastAPI gateway (OpenAI-compatible API)
+│   ├── agent.py         # LangChain ReAct agent + system prompt
+│   ├── mcp_adapter.py   # MCP → LangChain StructuredTool adapter
+│   ├── rag.py           # ChromaDB helpers (get, add, reset, search)
+│   └── config.py        # Settings via pydantic-settings / .env
 ├── mcp_server/
 │   ├── main.py          # MCP server entry point (FastAPI + SSE)
-│   ├── server.py        # MCP tool registration
-│   ├── config.py        # MCP server settings (pydantic-settings)
+│   ├── server.py        # Tool registration and dispatch
+│   ├── config.py        # MCP server settings
 │   └── tools/
-│       ├── web_search.py
-│       ├── file_ops.py
-│       └── code_exec.py
-├── agent/
-│   ├── main.py          # OpenAI-compatible FastAPI gateway
-│   ├── agent.py         # LangChain ReAct agent
-│   ├── mcp_adapter.py   # MCP → LangChain tool adapter
-│   ├── rag.py           # ChromaDB RAG helpers
-│   └── config.py        # Agent settings (pydantic-settings)
+│       ├── web_search.py       # DuckDuckGo search
+│       ├── file_ops.py         # Sandboxed file read/write/list
+│       ├── code_exec.py        # Python subprocess with timeout
+│       └── kb_search.py        # ChromaDB knowledge base query
 ├── scripts/
-│   ├── start.sh         # Linux / macOS
-│   └── start.ps1        # Windows (PowerShell)
+│   ├── start.sh         # Linux / macOS launcher
+│   ├── start.ps1        # Windows launcher
+│   └── ingest.py        # GitHub → ChromaDB ingestion pipeline
 ├── tests/
-│   ├── test_mcp_tools.py
-│   └── test_agent.py
+│   ├── test_agent.py
+│   ├── test_mcp_adapter.py
+│   └── test_mcp_tools.py
 ├── .env.example
-├── pytest.ini
 ├── requirements.txt
-└── README.md
+└── docker-compose.yml
 ```
 
-## Benchmarks
+## Configuration
 
-| Model | Avg latency (tool call) | RAM |
-|---|---|---|
-| qwen2.5:1.5b | ~2–4s | ~1 GB |
-| gemma3:4b | ~4–6s | ~3.6 GB |
+Copy `.env.example` to `.env` to override defaults:
 
-*Measured on i7-8565U · 16 GB RAM · CPU-only inference. `gemma3:2b` is the default — reliable ReAct format, fits with normal system load. `gemma3:4b` gives better reasoning but requires ~6 GB free RAM.*
+```env
+# Model
+OLLAMA_MODEL=qwen2.5:3b        # default — good tool use, ~2 GB RAM
+OLLAMA_EMBED_MODEL=nomic-embed-text
 
-## Trade-offs
+# Ports
+AGENT_API_PORT=8000
+MCP_SERVER_PORT=8001
 
-**stdio vs SSE transport** — stdio is simpler for local dev, SSE allows remote MCP servers. This repo defaults to SSE so the server is independently restartable.
+# Storage
+CHROMA_PERSIST_DIR=.chroma
+FILE_OPS_ROOT=./workspace
+```
 
-**Local vs cloud LLM** — Ollama keeps everything offline and free. Swap `ChatOllama` for `ChatAnthropic` or `ChatOpenAI` in `agent/agent.py` with one line change.
+## Development
 
-**ReAct vs function-calling** — ReAct works with any model (including smaller local ones). If you switch to a model with native function-calling support, set `agent_type="openai-tools"` in `agent/agent.py`.
+```bash
+source .venv/bin/activate
+
+# Run all tests
+pytest -v
+
+# Run a single suite
+pytest tests/test_mcp_tools.py -v
+```
+
+Tests mock all external dependencies (Ollama, ChromaDB, DuckDuckGo). 22 tests, no live services required.
+
+## Model recommendations
+
+| Model | RAM | Tool use | Best for |
+|---|---|---|---|
+| `qwen2.5:1.5b` | ~1 GB | Limited | Fast answers, conversational only |
+| `qwen2.5:3b` | ~2 GB | Good | **Default** — reliable tool calls, fits most machines |
+| `qwen2.5:7b` | ~5 GB | Excellent | Best quality, needs 8+ GB free RAM |
+
+To change model: set `OLLAMA_MODEL=qwen2.5:7b` in `.env` and re-run `start.sh` (model is pulled automatically).
+
+## Design notes
+
+**MCP over stdio vs SSE** — This project uses SSE transport so the MCP server runs as an independent process, restartable without restarting the agent.
+
+**Explicit RAG via tool, not silent injection** — Early versions silently prepended retrieved chunks into every prompt. The current design exposes `query_knowledge_base` as a proper MCP tool: the agent decides when retrieval is useful, which is more transparent and avoids polluting prompts on irrelevant queries.
+
+**OpenAI-compatible API** — Swap `ChatOllama` for `ChatAnthropic` or `ChatOpenAI` in `agent/agent.py` with one line. Any client that speaks `/v1/chat/completions` (Continue, Open WebUI, LangChain) works out of the box.
+
+**ReAct vs function-calling** — ReAct works with any model, including smaller local ones that lack native function-calling. If you upgrade to a model with tool-call support, change `create_react_agent` to `create_openai_tools_agent` in `agent/agent.py`.

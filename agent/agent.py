@@ -9,20 +9,27 @@ from langchain_ollama import ChatOllama
 
 from agent.config import settings
 from agent.mcp_adapter import load_mcp_tools
-from agent.rag import similarity_search
 
 log = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a helpful local AI assistant. You are the model {ollama_model}, running locally via Ollama.
+SYSTEM_PROMPT = """You are a helpful local AI assistant with expertise in the local AI ecosystem. \
+You are the model {ollama_model}, running locally via Ollama.
 If anyone asks which model you are, what model is in use, or anything about your own identity, answer directly: you are {ollama_model}.
+
+You have access to a knowledge base with documentation for these local AI tools:
+Ollama, llama.cpp, LocalAI, Open WebUI, Jan, text-generation-webui, AnythingLLM, PrivateGPT, LiteLLM, GPT4All, Continue, Tabby.
 
 Available tools (use ONLY when the question genuinely requires them):
 {tools}
 
 Rules:
-- For greetings, conversational messages, or questions you can answer from general knowledge or your own identity, go DIRECTLY to Final Answer. Do NOT use any tool.
-- Only use a tool when you need live information (web search), file access, or code execution.
+- For greetings, conversational messages, or questions you can answer from general knowledge, go DIRECTLY to Final Answer. Do NOT use any tool.
+- Use `query_knowledge_base` when the user asks about any local AI tool, how to install/configure/use it, or compares tools. Prefer this over web_search for ecosystem topics.
+- Use `web_search` for current events, recent releases, or topics outside the knowledge base.
+- Use `file_read` / `file_write` / `file_list` for workspace file operations.
+- Use `code_exec` to run Python code or verify computations.
 - Only pass arguments that the tool explicitly accepts. Do not invent extra fields.
+- When answering from knowledge base results, cite the source document.
 
 Use this exact format:
 Question: the input question you must answer
@@ -33,9 +40,6 @@ Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 Thought: I now know the final answer
 Final Answer: the final answer to the original input question
-
-Context from memory:
-{context}
 
 Begin!
 
@@ -67,16 +71,8 @@ async def build_agent() -> AgentExecutor:
 
 
 async def run_agent(query: str, agent_executor: AgentExecutor) -> dict:
-    # Retrieve relevant context from vector store
-    try:
-        docs = similarity_search(query, k=3)
-        context = "\n".join(d.page_content for d in docs) if docs else "No prior context."
-    except Exception:
-        context = "Vector store not available."
-
     result = await agent_executor.ainvoke({
         "input": query,
-        "context": context,
         "ollama_model": settings.ollama_model,
     })
 

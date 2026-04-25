@@ -33,8 +33,7 @@ async def test_chat_completion():
         "intermediate_steps": [],
     }
 
-    with patch("agent.main._agent_executor", new=mock_executor), \
-         patch("agent.agent.similarity_search", return_value=[]):
+    with patch("agent.main._agent_executor", new=mock_executor):
         from agent.main import app
         from httpx import AsyncClient, ASGITransport
 

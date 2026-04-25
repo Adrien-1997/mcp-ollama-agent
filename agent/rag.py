@@ -40,5 +40,12 @@ def add_documents(texts: list[str], metadatas: list[dict] | None = None) -> None
     log.info("Added %d documents to vector store", len(docs))
 
 
+def reset_vectorstore() -> None:
+    global _vectorstore
+    if _vectorstore is not None:
+        _vectorstore.delete_collection()
+        _vectorstore = None
+
+
 def similarity_search(query: str, k: int = 4) -> list[Document]:
     return get_vectorstore().similarity_search(query, k=k)

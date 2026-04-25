@@ -81,3 +81,45 @@ async def test_code_exec_timeout():
     result = await code_exec("import time; time.sleep(99)", timeout=1)
     assert "error" in result
     assert "timed out" in result["error"]
+
+
+# --- kb_search ---
+
+@pytest.mark.asyncio
+async def test_query_knowledge_base_returns_results():
+    from langchain_core.documents import Document
+    mock_docs = [
+        Document(page_content="Ollama runs models locally.", metadata={"source": "github/ollama/ollama/README.md", "url": "https://github.com/ollama/ollama/blob/main/README.md"}),
+        Document(page_content="Use `ollama run llama3` to start.", metadata={"source": "github/ollama/ollama/docs/api.md", "url": "https://github.com/ollama/ollama/blob/main/docs/api.md"}),
+    ]
+    with patch("agent.rag.similarity_search", return_value=mock_docs):
+        from mcp_server.tools.kb_search import query_knowledge_base
+        result = await query_knowledge_base("how to run ollama", k=2)
+
+    assert result["query"] == "how to run ollama"
+    assert len(result["results"]) == 2
+    assert result["results"][0]["content"] == "Ollama runs models locally."
+    assert result["results"][0]["source"] == "github/ollama/ollama/README.md"
+    assert result["results"][0]["url"] == "https://github.com/ollama/ollama/blob/main/README.md"
+
+
+@pytest.mark.asyncio
+async def test_query_knowledge_base_clamps_k():
+    from langchain_core.documents import Document
+    mock_docs = [Document(page_content="chunk", metadata={})]
+    with patch("agent.rag.similarity_search", return_value=mock_docs) as mock_search:
+        from mcp_server.tools.kb_search import query_knowledge_base
+        await query_knowledge_base("test", k=99)
+        called_k = mock_search.call_args[0][1]
+        assert called_k == 10  # clamped to max
+
+
+@pytest.mark.asyncio
+async def test_query_knowledge_base_handles_error():
+    with patch("agent.rag.similarity_search", side_effect=Exception("ChromaDB unavailable")):
+        from mcp_server.tools.kb_search import query_knowledge_base
+        result = await query_knowledge_base("ollama api")
+
+    assert result["results"] == []
+    assert "error" in result
+    assert "ChromaDB unavailable" in result["error"]
